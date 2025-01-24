@@ -14,12 +14,17 @@ pub fn main() !void {
 
     const camera = Vec3.new(0, 0, -20);
     const focal_dist: f32 = 10;
-    const sphere_center = Vec3.new(10, 10, 0);
-    const sphere_radius: f32 = 5;
+    // const sphere_center = Vec3.new(0, 0, 0);
+    // const sphere_radius: f32 = 2;
     const screen_up = Vec3.new(0, 1, 0);
     const screen_right = Vec3.new(1, 0, 0);
 
     const view_direction = Vec3.new(0, 0, 1);
+
+    const red_sphere = Sphere.new("255 0 0", Vec3.new(0, 0, 0), 2);
+    const blue_sphere = Sphere.new("0 0 255", Vec3.new(3, -2, 0), 2);
+
+    const spheres = [_]Sphere{ blue_sphere, red_sphere };
 
     // iterate y from height-1 down to 0 so that in the final image, the top row
     // corresponds to a higher y-value in world space (i.e. "up" is actually up).
@@ -28,26 +33,28 @@ pub fn main() !void {
         var x: f32 = 0;
         while (x < width) : (x += 1) {
             const step = Vec3.new(x, y, 0);
-            if (x == 32 and y == 24) {
-                std.debug.print("print step: ", .{});
-                step.print();
-            }
 
-            const pixel = get_pixel(step, camera, view_direction, focal_dist, width, height, screen_up, screen_right);
-            if (x == 32 and y == 24) {
-                std.debug.print("print pixel: ", .{});
-                pixel.print();
-            }
+            const pixel = get_3d_space_pixel(step, camera, view_direction, focal_dist, width, height, screen_up, screen_right);
 
             const dir = get_ray_direction(pixel, camera);
-            if (x == 32 and y == 24) {
-                std.debug.print("print dir: ", .{});
-                dir.print();
-                std.debug.print("\n", .{});
+
+            // find the closest sphere in the set
+            var sphere_to_draw: ?Sphere = null;
+            for (spheres) |sphere| {
+                var closest: ?f32 = null;
+                if (sphere_intersection(camera, dir, sphere.radius, sphere.center)) |t| {
+                    if (closest) |c| {
+                        closest = if (t < c) t else c;
+                        sphere_to_draw = sphere;
+                    } else {
+                        closest = t;
+                        sphere_to_draw = sphere;
+                    }
+                }
             }
 
-            if (sphere_intersection(camera, dir, sphere_radius, sphere_center)) {
-                try stdout.print("255 0 0\n", .{});
+            if (sphere_to_draw) |sphere| {
+                try stdout.print("{s}\n", .{sphere.color});
             } else {
                 try stdout.print("0 255 0\n", .{});
             }
@@ -55,28 +62,41 @@ pub fn main() !void {
     }
 }
 
-pub fn sphere_intersection(camera: Vec3, ray_direction: Vec3, sphere_radius: f32, sphere_center: Vec3) bool {
+pub fn sphere_intersection(camera: Vec3, ray_direction: Vec3, sphere_radius: f32, sphere_center: Vec3) ?f32 {
     const r_squared = sphere_radius * sphere_radius;
     const L = camera.subtract(sphere_center);
 
-    const a = ray_direction.dot(ray_direction); // Length squared of ray direction
-    const b = 2.0 * L.dot(ray_direction); // 2 times alignment of L with ray
-    const c = L.dot(L) - r_squared; // Length squared of L minus radius squared
+    const a = ray_direction.dot(ray_direction);
+    const b = 2.0 * L.dot(ray_direction);
+    const c = L.dot(L) - r_squared;
 
     // Compute discriminant
     const discriminant = (b * b) - (4.0 * a * c);
-    // If discriminant is negative, no intersection
     if (discriminant < 0) {
-        return false;
+        return null; // No intersection
     }
-    return true; // Intersection exists
+
+    const sqrt_discriminant = std.math.sqrt(discriminant);
+    const t1 = (-b - sqrt_discriminant) / (2.0 * a);
+    const t2 = (-b + sqrt_discriminant) / (2.0 * a);
+
+    // Find the smallest positive t
+    if (t1 > 0 and t2 > 0) {
+        return if (t1 < t2) t1 else t2;
+    } else if (t1 > 0) {
+        return t1;
+    } else if (t2 > 0) {
+        return t2;
+    } else {
+        return null; // Both intersections are behind the camera
+    }
 }
 
 pub fn get_ray_direction(pixel: Vec3, camera: Vec3) Vec3 {
     return pixel.subtract(camera);
 }
 
-pub fn get_pixel(step: Vec3, camera: Vec3, view_direction: Vec3, focal_distance: f32, screen_width: f32, screen_height: f32, screen_up: Vec3, screen_right: Vec3) Vec3 {
+pub fn get_3d_space_pixel(step: Vec3, camera: Vec3, view_direction: Vec3, focal_distance: f32, screen_width: f32, screen_height: f32, screen_up: Vec3, screen_right: Vec3) Vec3 {
     const screen_midpoint = Vec3.add(camera, view_direction.apply_scalar(focal_distance));
 
     // center x and y in negative space
@@ -97,6 +117,16 @@ pub fn get_pixel(step: Vec3, camera: Vec3, view_direction: Vec3, focal_distance:
 
     return screen_midpoint.add(x_step.add(y_step));
 }
+
+const Sphere = struct {
+    color: []const u8,
+    center: Vec3,
+    radius: f32,
+
+    pub fn new(color: []const u8, center: Vec3, radius: f32) Sphere {
+        return Sphere{ .color = color, .center = center, .radius = radius };
+    }
+};
 
 const Vec3 = struct {
     x: f32,
