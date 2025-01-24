@@ -61,8 +61,6 @@ pub fn sphere_intersection(camera: Vec3, ray_direction: Vec3, sphere_radius: f32
     const b = 2.0 * L.dot(ray_direction); // 2 times alignment of L with ray
     const c = L.dot(L) - r_squared; // Length squared of L minus radius squared
 
-    // std.debug.print("print a:{d}, b:{d}, c:{d} ", .{ a, b, c });
-
     // Compute discriminant
     const discriminant = (b * b) - (4.0 * a * c);
     // If discriminant is negative, no intersection
@@ -77,16 +75,23 @@ pub fn get_ray_direction(pixel: Vec3, camera: Vec3) Vec3 {
 }
 
 pub fn get_pixel(step: Vec3, camera: Vec3, view_direction: Vec3, focal_distance: f32, screen_width: f32, screen_height: f32, screen_up: Vec3, screen_right: Vec3) Vec3 {
-    const screen_midpoint = Vec3.add(camera, Vec3.apply_scalar(view_direction, focal_distance));
+    const screen_midpoint = Vec3.add(camera, view_direction.apply_scalar(focal_distance));
 
-    // Convert pixel coordinates to be centered around 0:
-    // First, move origin to center by subtracting half width/height
+    // center x and y in negative space
     const centered_x = step.x - (screen_width / 2.0);
     const centered_y = step.y - (screen_height / 2.0);
 
-    // Then scale to our desired world size, accounting for aspect ratio
-    const x_step = screen_right.apply_scalar(centered_x * (focal_distance / screen_width));
-    const y_step = screen_up.apply_scalar(centered_y * (focal_distance / screen_width));
+    const aspect_ratio = screen_width / screen_height;
+
+    // Convert "centered_x" and "centered_y" to a real-world offset on the plane.
+    //    - "focal_distance / screen_width" is a simple scale factor. The bigger
+    //      the screen_width, the less each pixel moves you in real space.
+    //    - We multiply the horizontal offset by "aspect" to avoid distortion.
+    const scale_x = (focal_distance / screen_width) * aspect_ratio;
+    const scale_y = (focal_distance / screen_width);
+
+    const x_step = screen_right.apply_scalar(centered_x * scale_x);
+    const y_step = screen_up.apply_scalar(centered_y * scale_y);
 
     return screen_midpoint.add(x_step.add(y_step));
 }
