@@ -14,15 +14,17 @@ pub fn main() !void {
 
     const camera = Vec3.new(0, 0, -20);
     const focal_dist: f32 = 10;
-    const sphere_center = Vec3.new(0, 0, 0);
+    const sphere_center = Vec3.new(10, 10, 0);
     const sphere_radius: f32 = 5;
     const screen_up = Vec3.new(0, 1, 0);
     const screen_right = Vec3.new(1, 0, 0);
 
     const view_direction = Vec3.new(0, 0, 1);
 
-    var y: f32 = 0;
-    while (y < height) : (y += 1) {
+    // iterate y from height-1 down to 0 so that in the final image, the top row
+    // corresponds to a higher y-value in world space (i.e. "up" is actually up).
+    var y: f32 = height;
+    while (y >= 0) : (y -= 1) {
         var x: f32 = 0;
         while (x < width) : (x += 1) {
             const step = Vec3.new(x, y, 0);
