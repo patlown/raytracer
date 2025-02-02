@@ -63,10 +63,10 @@ pub fn main() !void {
                 var in_shadow = false;
                 for (spheres) |other_sphere| {
                     if (other_sphere.equals(is.sphere)) continue;
-
                     if (sphere_intersection(is.intersection_point, point_to_light, other_sphere.radius, other_sphere.center)) |_| {
                         // hit another sphere, this point is in shadow
                         in_shadow = true;
+                        break;
                     }
                 }
 
