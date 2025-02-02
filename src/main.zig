@@ -23,9 +23,10 @@ pub fn main() !void {
     const view_direction = Vec3.new(0, 0, 1);
 
     const red_sphere = Sphere.new(Vec3.new(1, 0, 0), Vec3.new(2, 5, 0), 2);
-    // const blue_sphere = Sphere.new(Vec3.new(0, 0, 1), Vec3.new(1, 0, 0), 2);
+    const blue_sphere = Sphere.new(Vec3.new(0, 0, 1), Vec3.new(1, 0, 20), 2);
+    const green_sphere = Sphere.new(Vec3.new(0, 1, 0), Vec3.new(1, 3, 10), 2);
 
-    const spheres = [_]Sphere{red_sphere};
+    const spheres = [_]Sphere{ red_sphere, blue_sphere, green_sphere };
 
     // iterate y from height-1 down to 0 so that in the final image, the top row
     // corresponds to a higher y-value in world space (i.e. "up" is actually up).
@@ -39,27 +40,73 @@ pub fn main() !void {
             const ray_direction = pixel_in_world_space.subtract(camera).normalize();
 
             // find the closest sphere in the set
-            var sphere_to_draw: ?Sphere = null;
-            var closest: ?f32 = null;
-            for (spheres) |sphere| {
-                if (sphere_intersection(camera, ray_direction, sphere.radius, sphere.center)) |t| {
-                    if (closest) |c| {
-                        closest = if (t < c) t else c;
-                        sphere_to_draw = sphere;
-                    } else {
-                        closest = t;
-                        sphere_to_draw = sphere;
+            // var sphere_to_draw: ?Sphere = null;
+            // var closest: ?f32 = null;
+            // for (spheres) |sphere| {
+            //     if (sphere_intersection(camera, ray_direction, sphere.radius, sphere.center)) |t| {
+            //         if (closest) |c| {
+            //             closest = if (t < c) t else c;
+            //             sphere_to_draw = sphere;
+            //         } else {
+            //             closest = t;
+            //             sphere_to_draw = sphere;
+            //         }
+            //     }
+            // }
+
+            var intersected_sphere: ?IntersectedSphere = null;
+            for (spheres, 0..) |sphere, index| {
+                const distance = sphere_intersection(camera, ray_direction, sphere.radius, sphere.center);
+
+                if (distance) |d| {
+                    var closest = d;
+                    var sphere_to_draw = sphere;
+                    for (spheres[index + 1 ..]) |other_sphere| {
+                        if (sphere_intersection(camera, ray_direction, other_sphere.radius, other_sphere.center)) |t| {
+                            if (t < d) { // we hit the other sphere first
+                                closest = t;
+                                sphere_to_draw = other_sphere;
+                            }
+                        }
                     }
+
+                    // save intersected sphere
+                    intersected_sphere = IntersectedSphere.new(sphere_to_draw, camera.add(ray_direction.apply_scalar(closest)));
                 }
             }
-            if (sphere_to_draw) |sphere| {
-                // if closest isn't set for some reason, crash!
-                const color = calculate_sphere_color_from_light(sphere, camera.add(ray_direction.apply_scalar(closest orelse unreachable)), light);
-                // const color = sphere.color;
+
+            if (intersected_sphere) |is| {
+                const color = calculate_sphere_color_from_light(is.sphere, is.intersection_point, light);
                 try stdout.print("{d} {d} {d}\n", .{ round_to_u8(color.x), round_to_u8(color.y), round_to_u8(color.z) });
             } else {
-                try stdout.print("0 255 0\n", .{});
+                try stdout.print("0 0 0\n", .{});
             }
+
+            // if (sphere_to_draw) |sphere| {
+            //     // if closest isn't set for some reason, crash!
+            //     // const color = calculate_sphere_color_from_light(sphere, camera.add(ray_direction.apply_scalar(closest orelse unreachable)), light);
+
+            //     // light the sphere, need to check if it blocked from the light by other spheres
+
+            //     for (spheres) |other_sphere| {
+            //         // don't care whether this sphere interesects itself
+            //         if (other_sphere.center == sphere.center) continue;
+
+            //         // check for intersection with another sphere
+            //         const intersection_point = camera.add(ray_direction.apply_scalar(closest));
+            //         const light_direction = light.source.subtract(intersection_point).normalize();
+
+            //         if (sphere_intersection(intersection_point, light, other_sphere.radius, other_sphere.center)) |t| {
+            //             // we've hit another sphere, it is blocking the light
+            //             try stdout.print("0 0 0\n", .{});
+            //             break;
+            //         }
+            //     }
+
+            //     try stdout.print("{d} {d} {d}\n", .{ round_to_u8(color.x), round_to_u8(color.y), round_to_u8(color.z) });
+            // } else {
+            //     try stdout.print("0 0 0\n", .{});
+            // }
 
             // // todo: figure out how to somewhat efficiently check for light blocking from any other spheres
             // // figure out how to apply lighting intensity based on the angle
@@ -204,6 +251,15 @@ const Sphere = struct {
 
     pub fn new(color: Vec3, center: Vec3, radius: f32) Sphere {
         return Sphere{ .color = color, .center = center, .radius = radius };
+    }
+};
+
+const IntersectedSphere = struct {
+    sphere: Sphere,
+    intersection_point: Vec3,
+
+    pub fn new(sphere: Sphere, ip: Vec3) IntersectedSphere {
+        return IntersectedSphere{ .sphere = sphere, .intersection_point = ip };
     }
 };
 
