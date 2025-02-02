@@ -4,8 +4,8 @@ const expect = std.testing.expect;
 pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
 
-    const width: f32 = 64;
-    const height: f32 = 48;
+    const width: f32 = 640;
+    const height: f32 = 480;
     const max_value: u16 = 255;
 
     try stdout.print("P3\n", .{});
@@ -15,19 +15,17 @@ pub fn main() !void {
     const camera = Vec3.new(0, 0, -20);
     const focal_dist: f32 = 10;
 
+    const light = Light.new(LightColors.white, Vec3.new(10, 0, -20));
+
     // const screen_up = Vec3.new(0, 1, 0);
     // const screen_right = Vec3.new(1, 0, 0);
 
     const view_direction = Vec3.new(0, 0, 1);
 
     const red_sphere = Sphere.new(Vec3.new(1, 0, 0), Vec3.new(2, 5, 0), 2);
-    const blue_sphere = Sphere.new(Vec3.new(0, 0, 1), Vec3.new(1, 0, 0), 2);
+    // const blue_sphere = Sphere.new(Vec3.new(0, 0, 1), Vec3.new(1, 0, 0), 2);
 
-    const spheres = [_]Sphere{ blue_sphere, red_sphere };
-
-    // const light = Vec3.new(0, 0, -30);
-
-    // const light_color = "236 232 101";
+    const spheres = [_]Sphere{red_sphere};
 
     // iterate y from height-1 down to 0 so that in the final image, the top row
     // corresponds to a higher y-value in world space (i.e. "up" is actually up).
@@ -54,9 +52,11 @@ pub fn main() !void {
                     }
                 }
             }
-
             if (sphere_to_draw) |sphere| {
-                try stdout.print("{s}\n", .{sphere.get_8_bit_color()});
+                // if closest isn't set for some reason, crash!
+                const color = calculate_sphere_color_from_light(sphere, camera.add(ray_direction.apply_scalar(closest orelse unreachable)), light);
+                // const color = sphere.color;
+                try stdout.print("{d} {d} {d}\n", .{ round_to_u8(color.x), round_to_u8(color.y), round_to_u8(color.z) });
             } else {
                 try stdout.print("0 255 0\n", .{});
             }
@@ -99,6 +99,16 @@ pub fn main() !void {
     }
 }
 
+pub fn round_to_u8(value: f32) u8 {
+    const clamped = std.math.clamp(value, 0.0, 1.0);
+
+    const scaled = clamped * 255.0;
+
+    const rounded = @floor(scaled + 0.5);
+
+    return @intFromFloat(rounded);
+}
+
 pub fn sphere_intersection(camera: Vec3, ray_direction: Vec3, sphere_radius: f32, sphere_center: Vec3) ?f32 {
     const r_squared = sphere_radius * sphere_radius;
     const L = camera.subtract(sphere_center);
@@ -118,14 +128,15 @@ pub fn sphere_intersection(camera: Vec3, ray_direction: Vec3, sphere_radius: f32
     const t2 = (-b + sqrt_discriminant) / (2.0 * a);
 
     // Find the smallest positive t
-    if (t1 > 0 and t2 > 0) {
+    const epsilon: f32 = 1e-4;
+    if (t1 > epsilon and t2 > epsilon) {
         return if (t1 < t2) t1 else t2;
-    } else if (t1 > 0) {
+    } else if (t1 > epsilon) {
         return t1;
-    } else if (t2 > 0) {
+    } else if (t2 > epsilon) {
         return t2;
     } else {
-        return null; // Both intersections are behind the camera
+        return null; // Ignore intersections too close to the origin
     }
 }
 
@@ -156,38 +167,35 @@ pub fn translate_pixel_to_world_space(camera: Vec3, screen_pixels_width: f32, sc
     // calculated x,y in world, now place on z axis by using z position from screen center
     const pixel_in_world_space = Vec3.new(x_world_space, y_world_space, screen_center.z);
 
-    if (pixel.x == 63 and pixel.y == 47) {
-        std.debug.print("screen pixel x: 63, y:47\n", .{});
-        pixel_in_world_space.print();
-    }
-
-    if (pixel.x == 0 and pixel.y == 0) {
-        std.debug.print("screen pixel x: 0, y:0\n", .{});
-        pixel_in_world_space.print();
-    }
-
-    if (pixel.x == 32 and pixel.y == 24) {
-        std.debug.print("screen pixel x: 32, y:24\n", .{});
-        pixel_in_world_space.print();
-    }
-
     return pixel_in_world_space;
 }
 
-// pub fn calculate_sphere_color_from_light(sphere: Sphere, intersection_point: Vec3, light: Light) Vec3 {
+pub fn calculate_sphere_color_from_light(sphere: Sphere, intersection_point: Vec3, light: Light) Vec3 {
+    const normal_to_point = intersection_point.subtract(sphere.center).normalize();
 
-//     const normal_to_point = intersection_point.subtract(sphere.center).normalize();
+    const light_to_point = light.source.subtract(intersection_point).normalize();
 
-//     const light_to_point = light.source.subtract(intersection_point).normalize();
+    const light_coefficient = light_to_point.dot(normal_to_point);
 
-//     const light_coefficient = light_to_point.dot(normal_to_point);
+    const clamped_light_coefficient = std.math.clamp(light_coefficient, 0.0, 1.0);
 
-// }
+    return light.color.product(sphere.color).apply_scalar(clamped_light_coefficient);
+}
 
-// const Light = struct {
-//     color: Vec3,
-//     source: Vec3
-// };
+const LightColors = struct {
+    pub const white = Vec3{ .x = 1.0, .y = 1.0, .z = 1.0 };
+    pub const warm = Vec3{ .x = 1.0, .y = 0.85, .z = 0.6 };
+    pub const cool = Vec3{ .x = 0.6, .y = 0.75, .z = 1.0 };
+};
+
+const Light = struct {
+    color: Vec3,
+    source: Vec3,
+
+    pub fn new(color: Vec3, source: Vec3) Light {
+        return Light{ .color = color, .source = source };
+    }
+};
 
 const Sphere = struct {
     color: Vec3,
@@ -196,12 +204,6 @@ const Sphere = struct {
 
     pub fn new(color: Vec3, center: Vec3, radius: f32) Sphere {
         return Sphere{ .color = color, .center = center, .radius = radius };
-    }
-
-    pub fn get_8_bit_color(self: Sphere) []const u8 {
-        var buffer: [12]u8 = undefined;
-        const slice = std.fmt.bufPrint(&buffer, "{d} {d} {d}", .{ @as(u8, @intFromFloat(self.color.x * 255.0)), @as(u8, @intFromFloat(self.color.y * 255.0)), @as(u8, @intFromFloat(self.color.z * 255.0)) }) catch unreachable;
-        return buffer[0..slice.len];
     }
 };
 
@@ -216,6 +218,10 @@ const Vec3 = struct {
 
     pub fn apply_scalar(self: Vec3, s: f32) Vec3 {
         return Vec3.new(self.x * s, self.y * s, self.z * s);
+    }
+
+    pub fn product(self: Vec3, other: Vec3) Vec3 {
+        return Vec3.new(self.x * other.x, self.y * other.y, self.z * other.z);
     }
 
     pub fn add(self: Vec3, other: Vec3) Vec3 {
@@ -236,6 +242,11 @@ const Vec3 = struct {
 
     pub fn normalize(self: Vec3) Vec3 {
         const len = self.length();
+        const epsilon: f32 = 1e-6;
+        if (len < epsilon) {
+            std.debug.print("Warning: Zero or near-zero length vector encountered during normalization\n", .{});
+            return Vec3.new(0.0, 0.0, 0.0);
+        }
         return Vec3.new(self.x / len, self.y / len, self.z / len);
     }
 
