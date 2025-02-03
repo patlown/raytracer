@@ -1,6 +1,7 @@
 const std = @import("std");
 const expect = std.testing.expect;
 const Parser = @import("parser.zig").Parser;
+const Scene = @import("scene_details.zig").Scene;
 const Vec3 = @import("math.zig").Vec3;
 
 pub fn main() !void {
@@ -17,7 +18,7 @@ pub fn main() !void {
     const camera = Vec3.new(0, 0, -20);
     const focal_dist: f32 = 10;
 
-    const light = Light.new(LightColors.white, Vec3.new(-5, 0, -20));
+    const light = Scene.Light.new(Scene.LightColors.white, Vec3.new(-5, 0, -20));
 
     const view_direction = Vec3.new(0, 0, 1);
 
@@ -157,7 +158,7 @@ pub fn translate_pixel_to_world_space(camera: Vec3, screen_pixels_width: f32, sc
     return pixel_in_world_space;
 }
 
-pub fn calculate_sphere_color_from_light(sphere: Sphere, intersection_point: Vec3, light: Light) Vec3 {
+pub fn calculate_sphere_color_from_light(sphere: Sphere, intersection_point: Vec3, light: Scene.Light) Vec3 {
     const normal_to_point = intersection_point.subtract(sphere.center).normalize();
 
     const light_to_point = light.source.subtract(intersection_point).normalize();
@@ -168,21 +169,6 @@ pub fn calculate_sphere_color_from_light(sphere: Sphere, intersection_point: Vec
 
     return light.color.product(sphere.color).apply_scalar(clamped_light_coefficient);
 }
-
-const LightColors = struct {
-    pub const white = Vec3{ .x = 1.0, .y = 1.0, .z = 1.0 };
-    pub const warm = Vec3{ .x = 1.0, .y = 0.85, .z = 0.6 };
-    pub const cool = Vec3{ .x = 0.6, .y = 0.75, .z = 1.0 };
-};
-
-const Light = struct {
-    color: Vec3,
-    source: Vec3,
-
-    pub fn new(color: Vec3, source: Vec3) Light {
-        return Light{ .color = color, .source = source };
-    }
-};
 
 const Sphere = struct {
     color: Vec3,

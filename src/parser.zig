@@ -1,4 +1,5 @@
 const std = @import("std");
+const Vec3 = @import("math.zig").Vec3;
 
 pub const Parser = struct {
     allocator: std.mem.Allocator,
