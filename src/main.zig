@@ -1,6 +1,5 @@
 const std = @import("std");
 const expect = std.testing.expect;
-const Parser = @import("parser.zig").Parser;
 const Scene = @import("scene_details.zig").Scene;
 const Vec3 = @import("math.zig").Vec3;
 const Sphere = @import("shape.zig").Sphere;

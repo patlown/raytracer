@@ -1,20 +1,27 @@
+scene {
+    camera {
+        position: (0, 0, -20)
+        direction: (0, 0, 1)
+        focal_distance: 10
+    }
 
-details {
+    screen {
+        width: 480
+        height: 640
+    }
 
-camera: (0,0,-20)
-focal_distance: 10
-screen_height: 640
-screen_width: 480
-view_direction: (0, 0, 1)
-light_source: (0, 0, -20)
-light_color: (1, 1, 1)
-
-}
+    light {
+        position: (0, 0, -20)
+        color: (1, 1, 1)
+    }
 
 sphere {
-
     center: (0, 0, 0)
     radius: 5
-    color: (1, 0, 0)
+    material {
+        color: (1, 0, 0)
+        reflectivity: 0.5
+    }
+
 
 }
