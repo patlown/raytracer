@@ -8,8 +8,6 @@ pub const TokenType = enum {
     number,
     left_paren,
     right_paren,
-    comma,
-    whitespace,
     eof,
 };
 

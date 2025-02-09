@@ -17,10 +17,10 @@ test "parse_empty_scene" {
     var lexer = Lexer.new(input);
     const tokens = try lexer.lex(allocator);
 
-    const scene = try Parser.parse(tokens);
+    const scene = try Parser.parse(tokens, allocator);
 
     // Check that the scene has no blocks
-    try std.testing.expectEqual(scene.blocks.len, 2);
+    try std.testing.expectEqual(scene.blocks.len, 1);
 }
 
 // test "parse_single_block" {
