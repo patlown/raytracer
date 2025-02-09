@@ -20,7 +20,7 @@ test "parse_empty_scene" {
     const scene = try Parser.parse(tokens, allocator);
 
     // Check that the scene has no blocks
-    try std.testing.expectEqual(scene.blocks.len, 1);
+    try std.testing.expectEqual(scene.blocks.len, 0);
 }
 
 // test "parse_single_block" {

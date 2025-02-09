@@ -13,13 +13,13 @@ test "get some feedback" {
     // Get our tokens using the test allocator
     var tokens = try lexer.lex(testing.allocator);
     // Ensure we clean up our allocated memory
-    defer tokens.deinit();
+    defer testing.allocator.free(tokens);
 
     // The whitespace should have been skipped
-    try testing.expectEqual(tokens.items.len, 6);
+    try testing.expectEqual(tokens.len, 6);
 
     // Get our token - this is a Token struct, not an optional
-    const token = tokens.items[5];
+    const token = tokens[5];
 
     // If lexeme is an optional field in Token, we need to verify it exists
     // if (token.lexeme) |lexeme| {
@@ -46,13 +46,13 @@ test "numbers" {
     // Get our tokens using the test allocator
     var tokens = try lexer.lex(testing.allocator);
     // Ensure we clean up our allocated memory
-    defer tokens.deinit();
+    defer testing.allocator.free(tokens);
 
     // The whitespace should have been skipped
-    try testing.expectEqual(tokens.items.len, 4);
+    try testing.expectEqual(tokens.len, 4);
 
     // Get our token - this is a Token struct, not an optional
-    const token = tokens.items[2];
+    const token = tokens[2];
 
     // If lexeme is an optional field in Token, we need to verify it exists
     // if (token.lexeme) |lexeme| {

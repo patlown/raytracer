@@ -36,7 +36,7 @@ pub const Lexer = struct {
         };
     }
 
-    pub fn lex(self: *Lexer, allocator: std.mem.Allocator) !std.ArrayList(Token) {
+    pub fn lex(self: *Lexer, allocator: std.mem.Allocator) ![]const Token {
         var tokens = std.ArrayList(Token).init(allocator);
         errdefer tokens.deinit();
 
@@ -141,7 +141,7 @@ pub const Lexer = struct {
         }
 
         try tokens.append(Token.eof());
-        return tokens;
+        return tokens.toOwnedSlice();
     }
 
     fn is_digit(c: u8) bool {
