@@ -95,6 +95,8 @@ test "parse_basic_scene_file" {
     const tokens = try lexer.lex(allocator);
     const scene = try Parser.parse(tokens, allocator);
 
+    scene.print();
+
     // Check that the scene has the expected number of blocks
     try std.testing.expectEqual(scene.blocks.len, 4);
 }

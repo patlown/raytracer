@@ -1,25 +1,92 @@
 const std = @import("std");
 const Token = @import("tokenizer.zig").Token;
 const TokenType = @import("tokenizer.zig").TokenType;
+pub const Vector = struct {
+    x: f32,
+    y: f32,
+    z: f32,
 
-pub const Vector = struct { x: f32, y: f32, z: f32 };
+    pub fn print(self: Vector) void {
+        std.debug.print("({d}, {d}, {d})", .{ self.x, self.y, self.z });
+    }
+};
 
-pub const Value = union { number: f32, vector: Vector };
+pub const Value = union(enum) {
+    number: f32,
+    vector: Vector,
+
+    pub fn print(self: Value) void {
+        switch (self) {
+            .number => |n| std.debug.print("{d}", .{n}),
+            .vector => |v| v.print(),
+        }
+    }
+};
 
 pub const Identifier = struct {
     name: []const u8,
     pub fn new(name: []const u8) Identifier {
         return Identifier{ .name = name };
     }
+    pub fn print(self: Identifier) void {
+        std.debug.print("{s}", .{self.name});
+    }
 };
 
-pub const Property = struct { identifier: Identifier, value: Value };
+pub const Property = struct {
+    identifier: Identifier,
+    value: Value,
 
-pub const Block = struct { identifier: Identifier, properties: []const Property, blocks: []const Block };
+    pub fn print(self: Property) void {
+        self.identifier.print();
+        std.debug.print(": ", .{});
+        self.value.print();
+        std.debug.print("\n", .{});
+    }
+};
+
+pub const Block = struct {
+    identifier: Identifier,
+    properties: []const Property,
+    blocks: []const Block,
+
+    // indentation matters for the output
+    pub fn print(self: Block, indent: usize) void {
+        self.identifier.print();
+        std.debug.print(" {{\n", .{});
+        for (self.properties) |property| {
+            for (0..indent + 1) |_| {
+                std.debug.print("    ", .{});
+            }
+            property.print();
+        }
+        for (self.blocks) |block| {
+            for (0..indent + 1) |_| {
+                std.debug.print("    ", .{});
+            }
+            block.print(indent + 1);
+        }
+        for (0..indent) |_| {
+            std.debug.print("    ", .{});
+        }
+        std.debug.print("}}\n", .{});
+    }
+};
 
 pub const Scene = struct {
     identifier: Identifier,
     blocks: []const Block,
+
+    // indentation matters for the output
+    pub fn print(self: Scene) void {
+        self.identifier.print();
+        std.debug.print(" {{\n", .{});
+        for (self.blocks) |block| {
+            std.debug.print("    ", .{});
+            block.print(1);
+        }
+        std.debug.print("}}\n", .{});
+    }
 };
 
 pub const ParseError = error{ FLOAT_TOO_MANY_DIGITS, NO_TOKENS, SCENE_NOT_OPENED, SCENE_NOT_CLOSED, EXPECTED_IDENTIFIER, BlOCK_NOT_OPENED, BLOCK_NOT_CLOSED, EMPTY_BLOCK, UNEXPECTED_TOKEN };
