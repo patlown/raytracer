@@ -15,14 +15,14 @@ pub const Identifier = struct {
 
 pub const Property = struct { identifier: Identifier, value: Value };
 
-pub const Block = struct { identifier: Identifier, properties: []const Property };
+pub const Block = struct { identifier: Identifier, properties: []const Property, blocks: []const Block };
 
 pub const Scene = struct {
     identifier: Identifier,
     blocks: []const Block,
 };
 
-pub const ParseError = error{ NO_TOKENS, SCENE_NOT_OPENED, SCENE_NOT_CLOSED, EXPECTED_IDENTIFIER, BlOCK_NOT_OPENED, BLOCK_NOT_CLOSED };
+pub const ParseError = error{ FLOAT_TOO_MANY_DIGITS, NO_TOKENS, SCENE_NOT_OPENED, SCENE_NOT_CLOSED, EXPECTED_IDENTIFIER, BlOCK_NOT_OPENED, BLOCK_NOT_CLOSED, EMPTY_BLOCK, UNEXPECTED_TOKEN };
 
 pub const Parser = struct {
     const State = struct {
@@ -58,107 +58,216 @@ pub const Parser = struct {
                 return null;
             }
 
-            return &self.tokens[self.current];
+            return &self.tokens[next_index];
         }
     };
 
+    /// Entry point: parses a scene from tokens.
     pub fn parse(tokens: []const Token, allocator: std.mem.Allocator) !*Scene {
         if (tokens.len == 0) {
             return ParseError.NO_TOKENS;
         }
-
         var state = Parser.State.init(tokens, allocator);
 
-        const first = state.current_token();
-
-        if (first) |f| {
-            if (f.type != TokenType.identifier) {
-                return ParseError.SCENE_NOT_OPENED;
-            }
-
-            std.debug.print("\nlexeme: {s}\n", .{f.lexeme.?});
-
-            if (!std.mem.eql(u8, f.lexeme orelse unreachable, "scene")) {
-                return ParseError.SCENE_NOT_OPENED;
-            }
-
-            const open = state.jump_next() orelse return ParseError.SCENE_NOT_OPENED;
-            std.debug.print("\nlexeme: {s}\n", .{open.lexeme.?});
-
-            if (open.type != TokenType.left_brace) {
-                return ParseError.SCENE_NOT_OPENED;
-            }
-
-            const scene = try allocator.create(Scene);
-            scene.identifier = Identifier.new("scene");
-
-            state.increment();
-            scene.blocks = try Parser.parseBlocks(&state);
-
-            const close = state.current_token() orelse return ParseError.SCENE_NOT_CLOSED;
-            if (close.type != TokenType.right_brace) {
-                return ParseError.SCENE_NOT_CLOSED;
-            }
-            std.debug.print("\nlexeme: {s}\n", .{close.lexeme.?});
-
-            return scene;
+        // Expect the "scene" keyword.
+        const first = state.current_token() orelse return ParseError.SCENE_NOT_OPENED;
+        if (first.type != TokenType.identifier) {
+            return ParseError.SCENE_NOT_OPENED;
         }
+        if (!std.mem.eql(u8, first.lexeme orelse unreachable, "scene")) {
+            return ParseError.SCENE_NOT_OPENED;
+        }
+        state.current += 1; // consume "scene"
 
-        return ParseError.SCENE_NOT_OPENED;
+        // Expect the opening brace.
+        const open = state.current_token() orelse return ParseError.SCENE_NOT_OPENED;
+        if (open.type != TokenType.left_brace) {
+            return ParseError.SCENE_NOT_OPENED;
+        }
+        state.current += 1; // consume '{'
+
+        // Parse the blocks inside the scene.
+        const scene = try allocator.create(Scene);
+        scene.* = Scene{
+            .identifier = Identifier.new("scene"),
+            .blocks = try Parser.parseBlocks(&state),
+        };
+
+        // Expect the closing brace.
+        const close = state.current_token() orelse return ParseError.SCENE_NOT_CLOSED;
+        if (close.type != TokenType.right_brace) {
+            return ParseError.SCENE_NOT_CLOSED;
+        }
+        state.current += 1; // consume '}'
+
+        return scene;
     }
 
-    fn parseBlocks(state: *Parser.State) ![]const Block {
-        var token = state.current_token();
-        var blocks = std.ArrayList(Block).init(state.allocator);
-        errdefer blocks.deinit();
+    /// Parses a list of blocks until a right brace is encountered.
+    fn parseBlocks(state: *State) ![]const Block {
+        var blockList = std.ArrayList(Block).init(state.allocator);
+        // We intentionally do not call blockList.deinit() here,
+        // because we are “transferring” ownership of the allocated slice.
+        while (true) {
+            const token = state.current_token();
+            if (token) |tok| {
+                if (tok.type == TokenType.right_brace) break;
+                // Each block begins with an identifier.
+                const block = try Parser.parseBlock(state);
+                try blockList.append(block);
+            } else {
+                break;
+            }
+        }
+        return blockList.toOwnedSlice();
+    }
 
-        while (token) |t| : (token = null) {
-            std.debug.print("\ntoken in parse blocks: {s}\n", .{t.lexeme.?});
-            switch (t.type) {
-                TokenType.identifier => {
-                    if (state.jump_next()) |next| {
-                        if (next.type != TokenType.left_brace) {
-                            return ParseError.BlOCK_NOT_OPENED;
-                        }
-                    } else {
-                        return ParseError.BlOCK_NOT_OPENED;
-                    }
+    /// Parses a single block:
+    /// block := identifier "{" ( property | block )* "}"
+    fn parseBlock(state: *State) !Block {
+        // Expect an identifier for the block's name.
+        const idToken = state.current_token() orelse return ParseError.EXPECTED_IDENTIFIER;
+        if (idToken.type != TokenType.identifier) {
+            return ParseError.EXPECTED_IDENTIFIER;
+        }
+        const blockName = idToken.lexeme orelse unreachable;
+        state.current += 1; // consume the identifier
 
-                    // parse inner block
-                    const block = Block{
-                        .identifier = Identifier.new(t.lexeme orelse return ParseError.EXPECTED_IDENTIFIER),
-                        .properties = &[_]Property{},
-                    };
+        // Expect the opening brace.
+        const left = state.current_token() orelse return ParseError.BlOCK_NOT_OPENED;
+        if (left.type != TokenType.left_brace) {
+            return ParseError.BlOCK_NOT_OPENED;
+        }
+        state.current += 1; // consume '{'
 
-                    try blocks.append(block);
+        var propertyList = std.ArrayList(Property).init(state.allocator);
+        var blockList = std.ArrayList(Block).init(state.allocator);
 
-                    if (state.jump_next()) |next| {
-                        if (next.type != TokenType.right_brace) {
-                            return ParseError.BLOCK_NOT_CLOSED;
-                        }
-                    } else {
-                        return ParseError.BLOCK_NOT_CLOSED;
-                    }
-                },
-                else => {
-                    std.debug.print("\nthis should run\n", .{});
-                    // we only expect identifiers, if we don't see one,
-                    return blocks.toOwnedSlice();
-                },
+        // Parse contents until the closing brace.
+        while (true) {
+            const curr = state.current_token() orelse return ParseError.BLOCK_NOT_CLOSED;
+            if (curr.type == TokenType.right_brace) {
+                state.current += 1; // consume '}'
+                break;
             }
 
-            if (state.peek_next()) |p| {
-                switch (p.type) {
-                    TokenType.identifier => {
-                        token = state.jump_next();
-                    },
-                    else => {
-                        return blocks.toOwnedSlice();
-                    },
-                }
+            // Every entry in a block should start with an identifier.
+            if (curr.type != TokenType.identifier) {
+                return ParseError.UNEXPECTED_TOKEN;
+            }
+
+            // Peek to decide whether this is a property or a nested block.
+            const next = state.peek_next() orelse return ParseError.UNEXPECTED_TOKEN;
+            if (next.type == TokenType.colon) {
+                // Parse a property.
+                const prop = try Parser.parseProperty(state);
+                try propertyList.append(prop);
+            } else if (next.type == TokenType.left_brace) {
+                // Parse a nested block.
+                const nested = try Parser.parseBlock(state);
+                try blockList.append(nested);
+            } else {
+                return ParseError.UNEXPECTED_TOKEN;
             }
         }
 
-        return blocks.toOwnedSlice();
+        var properties: []const Property = &[_]Property{};
+        if (propertyList.items.len > 0) {
+            properties = try propertyList.toOwnedSlice();
+        }
+        var blocks: []const Block = &[_]Block{};
+        if (blockList.items.len > 0) {
+            blocks = try blockList.toOwnedSlice();
+        }
+
+        return Block{
+            .identifier = Identifier.new(blockName),
+            .properties = properties,
+            .blocks = blocks,
+        };
+    }
+
+    /// Parses a property:
+    /// property := identifier ":" value
+    fn parseProperty(state: *State) !Property {
+        // Expect property name (identifier).
+        const idToken = state.current_token() orelse return ParseError.EXPECTED_IDENTIFIER;
+        if (idToken.type != TokenType.identifier) {
+            return ParseError.EXPECTED_IDENTIFIER;
+        }
+        const propName = idToken.lexeme orelse unreachable;
+        state.current += 1; // consume identifier
+
+        // Expect colon.
+        const colon = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
+        if (colon.type != TokenType.colon) {
+            return ParseError.UNEXPECTED_TOKEN;
+        }
+        state.current += 1; // consume ':'
+
+        // Parse the property value.
+        const value = try Parser.parseValue(state);
+        return Property{
+            .identifier = Identifier.new(propName),
+            .value = value,
+        };
+    }
+
+    /// Parses a value:
+    /// value := number | vec3
+    /// vec3 := "(" number "," number "," number ")"
+    fn parseValue(state: *State) !Value {
+        const token = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
+        if (token.type == TokenType.left_paren) {
+            // Parse as a vec3.
+            state.current += 1; // consume '('
+
+            // Expect first number.
+            const xToken = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
+            if (xToken.type != TokenType.number) return ParseError.UNEXPECTED_TOKEN;
+            const x = try parseFloat(xToken.lexeme orelse unreachable);
+            state.current += 1; // consume first number
+
+            // Expect comma.
+            const comma1 = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
+            if (comma1.type != TokenType.comma) return ParseError.UNEXPECTED_TOKEN;
+            state.current += 1; // consume comma
+
+            // Expect second number.
+            const yToken = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
+            if (yToken.type != TokenType.number) return ParseError.UNEXPECTED_TOKEN;
+            const y = try parseFloat(yToken.lexeme orelse unreachable);
+            state.current += 1; // consume second number
+
+            // Expect comma.
+            const comma2 = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
+            if (comma2.type != TokenType.comma) return ParseError.UNEXPECTED_TOKEN;
+            state.current += 1; // consume comma
+
+            // Expect third number.
+            const zToken = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
+            if (zToken.type != TokenType.number) return ParseError.UNEXPECTED_TOKEN;
+            const z = try parseFloat(zToken.lexeme orelse unreachable);
+            state.current += 1; // consume third number
+
+            // Expect closing parenthesis.
+            const right = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
+            if (right.type != TokenType.right_paren) return ParseError.UNEXPECTED_TOKEN;
+            state.current += 1; // consume ')'
+
+            return Value{ .vector = Vector{ .x = x, .y = y, .z = z } };
+        } else if (token.type == TokenType.number) {
+            // Parse as a single number.
+            const num = try parseFloat(token.lexeme orelse unreachable);
+            state.current += 1; // consume the number
+            return Value{ .number = num };
+        } else {
+            return ParseError.UNEXPECTED_TOKEN;
+        }
+    }
+
+    /// Helper function to parse a floating-point number from a token’s lexeme.
+    fn parseFloat(s: []const u8) !f32 {
+        return try std.fmt.parseFloat(f32, s);
     }
 };

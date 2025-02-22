@@ -11,7 +11,7 @@ test "get some feedback" {
     var lexer = Lexer.new(input);
 
     // Get our tokens using the test allocator
-    var tokens = try lexer.lex(testing.allocator);
+    const tokens = try lexer.lex(testing.allocator);
     // Ensure we clean up our allocated memory
     defer testing.allocator.free(tokens);
 
@@ -40,11 +40,11 @@ test "get some feedback" {
 
 test "numbers" {
     // Test input with leading whitespace to verify whitespace handling
-    const input = "1.31\n 131\n 12.345\n";
+    const input = "1.0\n 131\n 12.345\n";
     var lexer = Lexer.new(input);
 
     // Get our tokens using the test allocator
-    var tokens = try lexer.lex(testing.allocator);
+    const tokens = try lexer.lex(testing.allocator);
     // Ensure we clean up our allocated memory
     defer testing.allocator.free(tokens);
 

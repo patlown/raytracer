@@ -9,6 +9,21 @@ pub const TokenType = enum {
     left_paren,
     right_paren,
     eof,
+    comma,
+
+    pub fn toString(self: TokenType) []const u8 {
+        return switch (self) {
+            .identifier => "identifier",
+            .left_brace => "left_brace",
+            .right_brace => "right_brace",
+            .colon => "colon",
+            .number => "number",
+            .left_paren => "left_paren",
+            .right_paren => "right_paren",
+            .eof => "eof",
+            .comma => "comma",
+        };
+    }
 };
 
 pub const Token = struct {
@@ -41,17 +56,14 @@ pub const Lexer = struct {
         errdefer tokens.deinit();
 
         while (self.current < self.source.len) {
-            std.debug.print("----- loop start\n", .{});
             const c = self.source[self.current];
-            std.debug.print("char: {c}, start: {d}, curr: {d}, len: {d}\n\n", .{ c, self.start, self.current, self.source.len });
 
             switch (c) {
-                'a'...'z' => {
+                'a'...'z', '_' => {
                     self.current += 1;
                 },
-                '1'...'9' => {
+                '0'...'9' => {
                     if (last_number(self)) {
-                        std.debug.print("considering as last number: {c}\n", .{c});
                         try tokens.append(Token{
                             .type = .number,
                             .lexeme = self.source[self.start .. self.current + 1],
@@ -63,6 +75,16 @@ pub const Lexer = struct {
                     } else {
                         self.current += 1;
                     }
+                },
+                ',' => {
+                    try tokens.append(Token{
+                        .type = .comma,
+                        .lexeme = self.source[self.start .. self.current + 1],
+                        .line = self.line,
+                    });
+
+                    self.current += 1;
+                    self.start = self.current;
                 },
                 '.' => {
                     if (between_numbers(self)) {
@@ -112,6 +134,16 @@ pub const Lexer = struct {
                     self.current += 1;
                     self.start = self.current;
                 },
+                ':' => {
+                    try tokens.append(Token{
+                        .type = .colon,
+                        .lexeme = self.source[self.start .. self.current + 1],
+                        .line = self.line,
+                    });
+
+                    self.current += 1;
+                    self.start = self.current;
+                },
                 ' ', '\n', '\t', 0 => {
                     if (self.current == self.start) {
                         self.current += 1;
@@ -134,10 +166,10 @@ pub const Lexer = struct {
 
                     return error.InvalidData;
                 },
-                else => return error.InvalidData,
+                else => {
+                    return error.InvalidData;
+                },
             }
-
-            std.debug.print("----- loop end\n", .{});
         }
 
         try tokens.append(Token.eof());
@@ -151,7 +183,6 @@ pub const Lexer = struct {
     fn last_number(self: *Lexer) bool {
         if (peek_next(self)) |next| {
             if (!is_digit(next) and !(next == '.')) {
-                std.debug.print("{c} not considered a digit\n", .{next});
                 return true;
             }
             // if the next is a digit, this is not the last number in this contiguous buffer
