@@ -1,6 +1,7 @@
 const std = @import("std");
 const Token = @import("tokenizer.zig").Token;
 const TokenType = @import("tokenizer.zig").TokenType;
+
 pub const Vector = struct {
     x: f32,
     y: f32,
@@ -50,8 +51,12 @@ pub const Block = struct {
     properties: []const Property,
     blocks: []const Block,
 
+    pub fn print(self: Block) void {
+        self.print_internal(0);
+    }
+
     // indentation matters for the output
-    pub fn print(self: Block, indent: usize) void {
+    fn print_internal(self: Block, indent: usize) void {
         self.identifier.print();
         std.debug.print(" {{\n", .{});
         for (self.properties) |property| {
@@ -64,7 +69,7 @@ pub const Block = struct {
             for (0..indent + 1) |_| {
                 std.debug.print("    ", .{});
             }
-            block.print(indent + 1);
+            block.print_internal(indent + 1);
         }
         for (0..indent) |_| {
             std.debug.print("    ", .{});
@@ -73,33 +78,16 @@ pub const Block = struct {
     }
 };
 
-pub const Scene = struct {
-    identifier: Identifier,
-    blocks: []const Block,
-
-    // indentation matters for the output
-    pub fn print(self: Scene) void {
-        self.identifier.print();
-        std.debug.print(" {{\n", .{});
-        for (self.blocks) |block| {
-            std.debug.print("    ", .{});
-            block.print(1);
-        }
-        std.debug.print("}}\n", .{});
-    }
-};
-
-pub const ParseError = error{ FLOAT_TOO_MANY_DIGITS, NO_TOKENS, SCENE_NOT_OPENED, SCENE_NOT_CLOSED, EXPECTED_IDENTIFIER, BlOCK_NOT_OPENED, BLOCK_NOT_CLOSED, EMPTY_BLOCK, UNEXPECTED_TOKEN };
+pub const ParseError = error{ FLOAT_TOO_MANY_DIGITS, NO_TOKENS, EXPECTED_IDENTIFIER, BlOCK_NOT_OPENED, BLOCK_NOT_CLOSED, EMPTY_BLOCK, UNEXPECTED_TOKEN };
 
 pub const Parser = struct {
     const State = struct {
         tokens: []const Token,
-        scene: Scene,
         current: usize,
         allocator: std.mem.Allocator,
 
         pub fn init(tokens: []const Token, allocator: std.mem.Allocator) State {
-            return State{ .tokens = tokens, .scene = undefined, .current = 0, .allocator = allocator };
+            return State{ .tokens = tokens, .current = 0, .allocator = allocator };
         }
 
         pub fn increment(self: *State) void {
@@ -110,7 +98,6 @@ pub const Parser = struct {
             if (self.current >= self.tokens.len) {
                 return null;
             }
-
             return &self.tokens[self.current];
         }
 
@@ -124,50 +111,21 @@ pub const Parser = struct {
             if (next_index >= self.tokens.len) {
                 return null;
             }
-
             return &self.tokens[next_index];
         }
     };
 
-    /// Entry point: parses a scene from tokens.
-    pub fn parse(tokens: []const Token, allocator: std.mem.Allocator) !*Scene {
+    /// Entry point: parses a block from tokens.
+    pub fn parse(tokens: []const Token, allocator: std.mem.Allocator) !*Block {
         if (tokens.len == 0) {
             return ParseError.NO_TOKENS;
         }
         var state = Parser.State.init(tokens, allocator);
-
-        // Expect the "scene" keyword.
-        const first = state.current_token() orelse return ParseError.SCENE_NOT_OPENED;
-        if (first.type != TokenType.identifier) {
-            return ParseError.SCENE_NOT_OPENED;
-        }
-        if (!std.mem.eql(u8, first.lexeme orelse unreachable, "scene")) {
-            return ParseError.SCENE_NOT_OPENED;
-        }
-        state.current += 1; // consume "scene"
-
-        // Expect the opening brace.
-        const open = state.current_token() orelse return ParseError.SCENE_NOT_OPENED;
-        if (open.type != TokenType.left_brace) {
-            return ParseError.SCENE_NOT_OPENED;
-        }
-        state.current += 1; // consume '{'
-
-        // Parse the blocks inside the scene.
-        const scene = try allocator.create(Scene);
-        scene.* = Scene{
-            .identifier = Identifier.new("scene"),
-            .blocks = try Parser.parseBlocks(&state),
-        };
-
-        // Expect the closing brace.
-        const close = state.current_token() orelse return ParseError.SCENE_NOT_CLOSED;
-        if (close.type != TokenType.right_brace) {
-            return ParseError.SCENE_NOT_CLOSED;
-        }
-        state.current += 1; // consume '}'
-
-        return scene;
+        // Parse the top-level block.
+        const blockVal = try Parser.parseBlock(&state);
+        const blockPtr = try allocator.create(Block);
+        blockPtr.* = blockVal;
+        return blockPtr;
     }
 
     /// Parses a list of blocks until a right brace is encountered.
@@ -313,12 +271,14 @@ pub const Parser = struct {
             // Parse three numbers separated by commas
             const x = try parseNumber(state);
 
+            // Expect comma.
             const comma1 = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
             if (comma1.type != TokenType.comma) return ParseError.UNEXPECTED_TOKEN;
             state.current += 1; // consume comma
 
             const y = try parseNumber(state);
 
+            // Expect comma.
             const comma2 = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
             if (comma2.type != TokenType.comma) return ParseError.UNEXPECTED_TOKEN;
             state.current += 1; // consume comma
