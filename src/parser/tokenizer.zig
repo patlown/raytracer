@@ -10,6 +10,7 @@ pub const TokenType = enum {
     right_paren,
     eof,
     comma,
+    minus,
 
     pub fn toString(self: TokenType) []const u8 {
         return switch (self) {
@@ -22,6 +23,7 @@ pub const TokenType = enum {
             .right_paren => "right_paren",
             .eof => "eof",
             .comma => "comma",
+            .minus => "minus",
         };
     }
 };
@@ -85,6 +87,20 @@ pub const Lexer = struct {
 
                     self.current += 1;
                     self.start = self.current;
+                },
+                '-' => {
+                    if (is_next_number(self)) {
+                        try tokens.append(Token{
+                            .type = .minus,
+                            .lexeme = self.source[self.start .. self.current + 1],
+                            .line = self.line,
+                        });
+
+                        self.current += 1;
+                        self.start = self.current;
+                    } else {
+                        return error.InvalidData;
+                    }
                 },
                 '.' => {
                     if (between_numbers(self)) {
@@ -198,6 +214,16 @@ pub const Lexer = struct {
                 if (is_digit(next) and is_digit(prev)) {
                     return true;
                 }
+            }
+        }
+
+        return false;
+    }
+
+    fn is_next_number(self: *Lexer) bool {
+        if (peek_next(self)) |next| {
+            if (is_digit(next)) {
+                return true;
             }
         }
 

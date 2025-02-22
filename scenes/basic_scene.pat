@@ -1,6 +1,6 @@
 scene {
     camera {
-        position : (0, 0, 20)
+        position : (0, 0, -20)
         direction : (0, 0, 1)
         focal_distance : 10
     }

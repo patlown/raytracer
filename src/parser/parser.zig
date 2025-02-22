@@ -285,48 +285,55 @@ pub const Parser = struct {
     /// vec3 := "(" number "," number "," number ")"
     fn parseValue(state: *State) !Value {
         const token = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
+
+        // Helper function to parse a potentially negative number
+        const parseNumber = struct {
+            fn parse(s: *State) !f32 {
+                var neg = false;
+                if (s.current_token()) |t| {
+                    if (t.type == TokenType.minus) {
+                        neg = true;
+                        s.current += 1; // consume minus
+                    }
+                }
+
+                const numToken = s.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
+                if (numToken.type != TokenType.number) return ParseError.UNEXPECTED_TOKEN;
+                const num = try parseFloat(numToken.lexeme orelse unreachable);
+                s.current += 1; // consume number
+
+                return if (neg) -num else num;
+            }
+        }.parse;
+
         if (token.type == TokenType.left_paren) {
             // Parse as a vec3.
             state.current += 1; // consume '('
 
-            // Expect first number.
-            const xToken = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
-            if (xToken.type != TokenType.number) return ParseError.UNEXPECTED_TOKEN;
-            const x = try parseFloat(xToken.lexeme orelse unreachable);
-            state.current += 1; // consume first number
+            // Parse three numbers separated by commas
+            const x = try parseNumber(state);
 
-            // Expect comma.
             const comma1 = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
             if (comma1.type != TokenType.comma) return ParseError.UNEXPECTED_TOKEN;
             state.current += 1; // consume comma
 
-            // Expect second number.
-            const yToken = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
-            if (yToken.type != TokenType.number) return ParseError.UNEXPECTED_TOKEN;
-            const y = try parseFloat(yToken.lexeme orelse unreachable);
-            state.current += 1; // consume second number
+            const y = try parseNumber(state);
 
-            // Expect comma.
             const comma2 = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
             if (comma2.type != TokenType.comma) return ParseError.UNEXPECTED_TOKEN;
             state.current += 1; // consume comma
 
-            // Expect third number.
-            const zToken = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
-            if (zToken.type != TokenType.number) return ParseError.UNEXPECTED_TOKEN;
-            const z = try parseFloat(zToken.lexeme orelse unreachable);
-            state.current += 1; // consume third number
+            const z = try parseNumber(state);
 
-            // Expect closing parenthesis.
+            // Expect closing parenthesis
             const right = state.current_token() orelse return ParseError.UNEXPECTED_TOKEN;
             if (right.type != TokenType.right_paren) return ParseError.UNEXPECTED_TOKEN;
             state.current += 1; // consume ')'
 
             return Value{ .vector = Vector{ .x = x, .y = y, .z = z } };
-        } else if (token.type == TokenType.number) {
-            // Parse as a single number.
-            const num = try parseFloat(token.lexeme orelse unreachable);
-            state.current += 1; // consume the number
+        } else if (token.type == TokenType.number or token.type == TokenType.minus) {
+            // Parse as a single number
+            const num = try parseNumber(state);
             return Value{ .number = num };
         } else {
             return ParseError.UNEXPECTED_TOKEN;
