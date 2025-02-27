@@ -40,10 +40,25 @@ test "interpret_camera_block" {
         .blocks = &[_]Block{},
     };
 
+    const screen_block = Block{
+        .identifier = .{ .name = "screen" },
+        .properties = &[_]Property{
+            .{
+                .identifier = .{ .name = "height" },
+                .value = Value{ .number = 640 },
+            },
+            .{
+                .identifier = .{ .name = "width" },
+                .value = Value{ .number = 480 },
+            },
+        },
+        .blocks = &[_]Block{},
+    };
+
     const scene_block = Block{
         .identifier = .{ .name = "Scene" },
         .properties = &[_]Property{},
-        .blocks = &[_]Block{camera_block},
+        .blocks = &[_]Block{ camera_block, screen_block },
     };
 
     // Interpret the block

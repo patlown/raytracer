@@ -7,7 +7,7 @@ const std = @import("std");
 
 pub const Scene = struct {
     camera: Camera,
-    screen: ?Screen,
+    screen: Screen,
     light: ?Light,
     shapes: []Shape,
 };
@@ -32,12 +32,12 @@ pub const Shape = union(enum) {
     Sphere: Sphere,
 };
 
-pub const InterpreterError = error{ InvalidCamera, InvalidScreen, InvalidLight, InvalidShape, InvalidScene, UnknownBlockIdentifier, MissingRequiredBlock };
+pub const InterpreterError = error{ ScreenAlreadyDefined, CameraAlreadyDefined, InvalidCamera, InvalidScreen, InvalidLight, InvalidShape, InvalidScene, UnknownBlockIdentifier, MissingRequiredBlock };
 
 pub const Interpreter = struct {
     pub fn interpret(ast: Block, allocator: std.mem.Allocator) !Scene {
         var camera: ?Camera = null;
-        const screen: ?Screen = null;
+        var screen: ?Screen = null;
         const light: ?Light = null;
         var shapes = std.ArrayList(Shape).init(allocator);
         errdefer shapes.deinit();
@@ -49,7 +49,7 @@ pub const Interpreter = struct {
         for (ast.blocks) |block| {
             if (std.mem.eql(u8, block.identifier.name, "camera")) {
                 if (camera != null) {
-                    return InterpreterError.InvalidCamera;
+                    return InterpreterError.CameraAlreadyDefined;
                 }
 
                 var position: ?Vec3 = null;
@@ -85,8 +85,40 @@ pub const Interpreter = struct {
                 } else {
                     return InterpreterError.InvalidCamera;
                 }
-            } else if (std.mem.eql(u8, block.identifier.name, "screen")) {
-                // Screen parsing logic here (not implemented yet)
+            } else if (stringEquals(block.identifier.name, "screen")) {
+                if (screen != null) {
+                    return InterpreterError.ScreenAlreadyDefined;
+                }
+
+                if (block.properties.len == 0) {
+                    return InterpreterError.InvalidScreen;
+                }
+
+                var width: ?f32 = null;
+                var height: ?f32 = null;
+
+                for (block.properties) |prop| {
+                    if (stringEquals(prop.identifier.name, "width")) {
+                        if (prop.value == .number) {
+                            width = prop.value.number;
+                        }
+                    } else if (stringEquals(prop.identifier.name, "height")) {
+                        if (prop.value == .number) {
+                            height = prop.value.number;
+                        }
+                    } else {
+                        return InterpreterError.InvalidScreen;
+                    }
+                }
+
+                if (width != null and height != null) {
+                    screen = Screen{
+                        .width = width.?,
+                        .height = height.?,
+                    };
+                } else {
+                    return InterpreterError.InvalidScreen;
+                }
             } else if (std.mem.eql(u8, block.identifier.name, "light")) {
                 // Light parsing logic here (not implemented yet)
             } else if (std.mem.eql(u8, block.identifier.name, "sphere")) {
@@ -96,15 +128,20 @@ pub const Interpreter = struct {
             }
         }
 
-        if (camera == null) {
+        // this needs to updated as this feature is built out
+        if (camera == null or screen == null) {
             return InterpreterError.MissingRequiredBlock;
         }
 
         return Scene{
             .camera = camera.?,
-            .screen = screen,
+            .screen = screen.?,
             .light = light,
             .shapes = try shapes.toOwnedSlice(),
         };
     }
 };
+
+pub fn stringEquals(a: []const u8, b: []const u8) bool {
+    return std.mem.eql(u8, a, b);
+}
