@@ -20,6 +20,25 @@ pub fn main() !void {
 }
 
 test "interpret_camera_block" {
+    const sphere_block = Block{
+        .identifier = .{ .name = "sphere" },
+        .properties = &[_]Property{
+            .{
+                .identifier = .{ .name = "center" },
+                .value = Value{ .vector = Vector{ .x = 0.0, .y = 0.0, .z = 0.0 } },
+            },
+            .{
+                .identifier = .{ .name = "radius" },
+                .value = Value{ .number = 1.0 },
+            },
+            .{
+                .identifier = .{ .name = "color" },
+                .value = Value{ .vector = Vector{ .x = 1.0, .y = 0.0, .z = 0.0 } },
+            },
+        },
+        .blocks = &[_]Block{},
+    };
+
     const light_block = Block{
         .identifier = .{ .name = "light" },
         .properties = &[_]Property{
@@ -72,7 +91,7 @@ test "interpret_camera_block" {
     const scene_block = Block{
         .identifier = .{ .name = "Scene" },
         .properties = &[_]Property{},
-        .blocks = &[_]Block{ camera_block, screen_block, light_block },
+        .blocks = &[_]Block{ camera_block, screen_block, light_block, sphere_block },
     };
 
     // Interpret the block
@@ -96,6 +115,18 @@ test "interpret_camera_block" {
     try std.testing.expectEqual(@as(f32, 0.0), scene.light.position.x);
     try std.testing.expectEqual(@as(f32, 0.0), scene.light.position.y);
     try std.testing.expectEqual(@as(f32, 5.0), scene.light.position.z);
+
+    const sphere = scene.shapes[0].sphere;
+
+    try std.testing.expectEqual(@as(f32, 0.0), sphere.center.x);
+    try std.testing.expectEqual(@as(f32, 0.0), sphere.center.y);
+    try std.testing.expectEqual(@as(f32, 0.0), sphere.center.z);
+
+    try std.testing.expectEqual(@as(f32, 1.0), sphere.radius);
+
+    try std.testing.expectEqual(@as(f32, 1.0), sphere.color.x);
+    try std.testing.expectEqual(@as(f32, 0.0), sphere.color.y);
+    try std.testing.expectEqual(@as(f32, 0.0), sphere.color.z);
 }
 
 // test "interpret_camera_from_string" {

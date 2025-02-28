@@ -29,7 +29,7 @@ pub const Light = struct {
 };
 
 pub const Shape = union(enum) {
-    Sphere: Sphere,
+    sphere: Sphere,
 };
 
 pub const InterpreterError = error{ MissingRequiredProperty, LightAlreadyDefined, ScreenAlreadyDefined, CameraAlreadyDefined, InvalidCamera, InvalidScreen, InvalidLight, InvalidShape, InvalidScene, UnknownBlockIdentifier, MissingRequiredBlock };
@@ -150,7 +150,30 @@ pub const Interpreter = struct {
                     .color = color.?,
                 };
             } else if (stringEquals(block.identifier.name, "sphere")) {
-                // Sphere parsing logic here (not implemented yet)
+                var color: ?Vec3 = null;
+                var center: ?Vec3 = null;
+                var radius: ?f32 = null;
+
+                for (block.properties) |value| {
+                    if (stringEquals(value.identifier.name, "color")) {
+                        if (value.value == .vector) {
+                            color = Vec3{ .x = value.value.vector.x, .y = value.value.vector.y, .z = value.value.vector.z };
+                        }
+                    } else if (stringEquals(value.identifier.name, "center")) {
+                        if (value.value == .vector) {
+                            center = Vec3{ .x = value.value.vector.x, .y = value.value.vector.y, .z = value.value.vector.z };
+                        }
+                    } else if (stringEquals(value.identifier.name, "radius")) {
+                        if (value.value == .number) {
+                            radius = value.value.number;
+                        }
+                    }
+                }
+
+                if (color == null or center == null or radius == null) {
+                    return InterpreterError.MissingRequiredProperty;
+                }
+                try shapes.append(.{ .sphere = Sphere{ .color = color.?, .center = center.?, .radius = radius.? } });
             } else {
                 return InterpreterError.UnknownBlockIdentifier;
             }

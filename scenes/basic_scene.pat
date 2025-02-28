@@ -18,9 +18,6 @@ scene {
     sphere {
         center : (0, 0, 0)
         radius : 5
-        material {
-            color : (1, 0, 0)
-            reflectivity : 0.5
-        }
+        color : (1, 0, 0)
     }
 }
