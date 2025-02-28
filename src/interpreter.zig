@@ -8,7 +8,7 @@ const std = @import("std");
 pub const Scene = struct {
     camera: Camera,
     screen: Screen,
-    light: ?Light,
+    light: Light,
     shapes: []Shape,
 };
 
@@ -32,13 +32,13 @@ pub const Shape = union(enum) {
     Sphere: Sphere,
 };
 
-pub const InterpreterError = error{ ScreenAlreadyDefined, CameraAlreadyDefined, InvalidCamera, InvalidScreen, InvalidLight, InvalidShape, InvalidScene, UnknownBlockIdentifier, MissingRequiredBlock };
+pub const InterpreterError = error{ MissingRequiredProperty, LightAlreadyDefined, ScreenAlreadyDefined, CameraAlreadyDefined, InvalidCamera, InvalidScreen, InvalidLight, InvalidShape, InvalidScene, UnknownBlockIdentifier, MissingRequiredBlock };
 
 pub const Interpreter = struct {
     pub fn interpret(ast: Block, allocator: std.mem.Allocator) !Scene {
         var camera: ?Camera = null;
         var screen: ?Screen = null;
-        const light: ?Light = null;
+        var light: ?Light = null;
         var shapes = std.ArrayList(Shape).init(allocator);
         errdefer shapes.deinit();
 
@@ -120,7 +120,35 @@ pub const Interpreter = struct {
                     return InterpreterError.InvalidScreen;
                 }
             } else if (stringEquals(block.identifier.name, "light")) {
-                // Light parsing logic here (not implemented yet)
+                if (light != null) {
+                    return InterpreterError.LightAlreadyDefined;
+                }
+
+                var position: ?Vec3 = null;
+                var color: ?Vec3 = null;
+
+                for (block.properties) |prop| {
+                    if (stringEquals(prop.identifier.name, "position")) {
+                        if (prop.value == .vector) {
+                            position = Vec3{ .x = prop.value.vector.x, .y = prop.value.vector.y, .z = prop.value.vector.z };
+                        }
+                    } else if (stringEquals(prop.identifier.name, "color")) {
+                        if (prop.value == .vector) {
+                            color = Vec3{ .x = prop.value.vector.x, .y = prop.value.vector.y, .z = prop.value.vector.z };
+                        }
+                    } else {
+                        return InterpreterError.InvalidScreen;
+                    }
+                }
+
+                if (position == null or color == null) {
+                    return InterpreterError.MissingRequiredProperty;
+                }
+
+                light = Light{
+                    .position = position.?,
+                    .color = color.?,
+                };
             } else if (stringEquals(block.identifier.name, "sphere")) {
                 // Sphere parsing logic here (not implemented yet)
             } else {
@@ -136,7 +164,7 @@ pub const Interpreter = struct {
         return Scene{
             .camera = camera.?,
             .screen = screen.?,
-            .light = light,
+            .light = light.?,
             .shapes = try shapes.toOwnedSlice(),
         };
     }

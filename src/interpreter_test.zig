@@ -20,7 +20,21 @@ pub fn main() !void {
 }
 
 test "interpret_camera_block" {
-    // Create a test block directly
+    const light_block = Block{
+        .identifier = .{ .name = "light" },
+        .properties = &[_]Property{
+            .{
+                .identifier = .{ .name = "position" },
+                .value = Value{ .vector = Vector{ .x = 0.0, .y = 0.0, .z = 5.0 } },
+            },
+            .{
+                .identifier = .{ .name = "color" },
+                .value = Value{ .vector = Vector{ .x = 1.0, .y = 1.0, .z = 1.0 } },
+            },
+        },
+        .blocks = &[_]Block{},
+    };
+
     const camera_block = Block{
         .identifier = .{ .name = "camera" },
         .properties = &[_]Property{
@@ -58,7 +72,7 @@ test "interpret_camera_block" {
     const scene_block = Block{
         .identifier = .{ .name = "Scene" },
         .properties = &[_]Property{},
-        .blocks = &[_]Block{ camera_block, screen_block },
+        .blocks = &[_]Block{ camera_block, screen_block, light_block },
     };
 
     // Interpret the block
@@ -74,6 +88,14 @@ test "interpret_camera_block" {
     try std.testing.expectEqual(@as(f32, -1.0), scene.camera.direction.z);
 
     try std.testing.expectEqual(@as(f32, 1.0), scene.camera.focal_distance);
+
+    try std.testing.expectEqual(@as(f32, 1.0), scene.light.color.x);
+    try std.testing.expectEqual(@as(f32, 1.0), scene.light.color.y);
+    try std.testing.expectEqual(@as(f32, 1.0), scene.light.color.z);
+
+    try std.testing.expectEqual(@as(f32, 0.0), scene.light.position.x);
+    try std.testing.expectEqual(@as(f32, 0.0), scene.light.position.y);
+    try std.testing.expectEqual(@as(f32, 5.0), scene.light.position.z);
 }
 
 // test "interpret_camera_from_string" {
