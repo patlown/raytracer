@@ -42,12 +42,12 @@ pub const Interpreter = struct {
         var shapes = std.ArrayList(Shape).init(allocator);
         errdefer shapes.deinit();
 
-        if (!std.mem.eql(u8, ast.identifier.name, "Scene")) {
+        if (!stringEquals(ast.identifier.name, "Scene")) {
             return InterpreterError.InvalidScene;
         }
 
         for (ast.blocks) |block| {
-            if (std.mem.eql(u8, block.identifier.name, "camera")) {
+            if (stringEquals(block.identifier.name, "camera")) {
                 if (camera != null) {
                     return InterpreterError.CameraAlreadyDefined;
                 }
@@ -57,17 +57,17 @@ pub const Interpreter = struct {
                 var focal_distance: ?f32 = null;
 
                 for (block.properties) |prop| {
-                    if (std.mem.eql(u8, prop.identifier.name, "position")) {
+                    if (stringEquals(prop.identifier.name, "position")) {
                         if (prop.value == .vector) {
                             const vec = prop.value.vector;
                             position = Vec3{ .x = vec.x, .y = vec.y, .z = vec.z };
                         }
-                    } else if (std.mem.eql(u8, prop.identifier.name, "direction")) {
+                    } else if (stringEquals(prop.identifier.name, "direction")) {
                         if (prop.value == .vector) {
                             const vec = prop.value.vector;
                             direction = Vec3{ .x = vec.x, .y = vec.y, .z = vec.z };
                         }
-                    } else if (std.mem.eql(u8, prop.identifier.name, "focal_distance")) {
+                    } else if (stringEquals(prop.identifier.name, "focal_distance")) {
                         if (prop.value == .number) {
                             focal_distance = prop.value.number;
                         }
@@ -119,9 +119,9 @@ pub const Interpreter = struct {
                 } else {
                     return InterpreterError.InvalidScreen;
                 }
-            } else if (std.mem.eql(u8, block.identifier.name, "light")) {
+            } else if (stringEquals(block.identifier.name, "light")) {
                 // Light parsing logic here (not implemented yet)
-            } else if (std.mem.eql(u8, block.identifier.name, "sphere")) {
+            } else if (stringEquals(block.identifier.name, "sphere")) {
                 // Sphere parsing logic here (not implemented yet)
             } else {
                 return InterpreterError.UnknownBlockIdentifier;
