@@ -4,7 +4,7 @@
 
 ### best looking renders so far (03-01-2025)
 
-![5k_sphere_shadows](src/render/5k_sphere_shadows.png)
+![5k_sphere_shadows](renders/sphere_shadows_5k.png)
 
 
 ### dev log
