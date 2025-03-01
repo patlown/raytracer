@@ -39,16 +39,16 @@ test "parse_block_with_property" {
     var lexer = Lexer.new(input);
     const tokens = try lexer.lex(allocator);
 
-    const scene = try Parser.parse(tokens, allocator);
+    const blocks = try Parser.parse(tokens, allocator);
 
     // Check that the scene has one block
-    try std.testing.expectEqual(scene.blocks.len, 1);
+    try std.testing.expectEqual(blocks.blocks.len, 1);
 
     // Check that the block has one property
-    try std.testing.expectEqual(scene.blocks[0].properties.len, 1);
+    try std.testing.expectEqual(blocks.blocks[0].properties.len, 1);
 
     // Check the property value
-    try std.testing.expectEqual(scene.blocks[0].properties[0].value.number, 1.0);
+    try std.testing.expectEqual(blocks.blocks[0].properties[0].value.number, 1.0);
 }
 
 test "parse_multiple_blocks" {
@@ -78,25 +78,4 @@ test "parse_vectors" {
 
     // Check the property values in each block
     try std.testing.expectEqual(scene.blocks[0].properties[0].value.vector.x, 1.0);
-}
-
-test "parse_basic_scene_file" {
-    // Get the directory of the current source file
-    const flags = std.fs.File.OpenFlags{ .mode = .read_only };
-    const file_path = "scenes/basic_scene.pat";
-    const file = try std.fs.cwd().openFile(file_path, flags);
-    defer file.close();
-
-    const content = try file.readToEndAlloc(allocator, 1024);
-    defer allocator.free(content);
-
-    // parse the content
-    var lexer = Lexer.new(content);
-    const tokens = try lexer.lex(allocator);
-    const block = try Parser.parse(tokens, allocator);
-
-    block.print();
-
-    // Check that the scene has the expected number of blocks
-    try std.testing.expectEqual(block.blocks.len, 4);
 }

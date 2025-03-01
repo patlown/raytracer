@@ -89,13 +89,13 @@ test "interpret_camera_block" {
     };
 
     const scene_block = Block{
-        .identifier = .{ .name = "Scene" },
+        .identifier = .{ .name = "scene" },
         .properties = &[_]Property{},
         .blocks = &[_]Block{ camera_block, screen_block, light_block, sphere_block },
     };
 
     // Interpret the block
-    const scene = try Interpreter.interpret(scene_block, allocator);
+    const scene = try Interpreter.interpret(&scene_block, allocator);
 
     // Check the camera properties
     try std.testing.expectEqual(@as(f32, 0.0), scene.camera.position.x);

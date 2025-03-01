@@ -5,7 +5,7 @@ const Value = @import("parser.zig").Value;
 const Property = @import("parser.zig").Property;
 const std = @import("std");
 
-pub const Scene = struct {
+pub const ParsedScene = struct {
     camera: Camera,
     screen: Screen,
     light: Light,
@@ -35,14 +35,14 @@ pub const Shape = union(enum) {
 pub const InterpreterError = error{ MissingRequiredProperty, LightAlreadyDefined, ScreenAlreadyDefined, CameraAlreadyDefined, InvalidCamera, InvalidScreen, InvalidLight, InvalidShape, InvalidScene, UnknownBlockIdentifier, MissingRequiredBlock };
 
 pub const Interpreter = struct {
-    pub fn interpret(ast: Block, allocator: std.mem.Allocator) !Scene {
+    pub fn interpret(ast: *const Block, allocator: std.mem.Allocator) !ParsedScene {
         var camera: ?Camera = null;
         var screen: ?Screen = null;
         var light: ?Light = null;
         var shapes = std.ArrayList(Shape).init(allocator);
         errdefer shapes.deinit();
 
-        if (!stringEquals(ast.identifier.name, "Scene")) {
+        if (!stringEquals(ast.identifier.name, "scene")) {
             return InterpreterError.InvalidScene;
         }
 
@@ -184,7 +184,7 @@ pub const Interpreter = struct {
             return InterpreterError.MissingRequiredBlock;
         }
 
-        return Scene{
+        return ParsedScene{
             .camera = camera.?,
             .screen = screen.?,
             .light = light.?,
